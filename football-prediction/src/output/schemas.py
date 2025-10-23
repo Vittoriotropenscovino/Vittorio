@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 
 
 class PredictionOutput(BaseModel):
@@ -35,14 +35,14 @@ class PredictionOutput(BaseModel):
     over_under_2_5: Dict[str, float]
     both_teams_score: Dict[str, float]
     clean_sheet_probability: Dict[str, float]
-    top_correct_scores: List[Dict[str, any]]
+    top_correct_scores: List[Dict[str, Any]]
 
     # Confidence & Quality
     confidence: float = Field(..., ge=0, le=1)
     data_quality: str = Field(..., example="HIGH")
 
     # Value betting
-    value_bets: List[Dict[str, any]] = []
+    value_bets: List[Dict[str, Any]] = []
 
     # Analysis factors
     key_factors: Dict[str, List[str]] = Field(

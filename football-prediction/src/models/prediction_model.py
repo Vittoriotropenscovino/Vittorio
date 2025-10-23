@@ -23,7 +23,13 @@ class PredictionModel:
         Args:
             features: Processed features dict from DataProcessor
             config: Model configuration (weights, parameters)
+
+        Raises:
+            ValueError: If features is None or empty
         """
+        if not features:
+            raise ValueError("Features dictionary cannot be None or empty")
+
         self.features = features
         self.config = config
         self.weights = config.get('weights', self._default_weights())
@@ -65,15 +71,15 @@ class PredictionModel:
             ml_probs
         )
 
-        # Calculate additional metrics
-        expected_goals = self._calculate_expected_goals()
+        # Calculate additional metrics (reuse poisson_probs to avoid recalculation)
+        expected_goals = self._calculate_expected_goals(poisson_probs)
         most_likely_score = self._most_likely_scoreline(expected_goals)
 
         result = {
             "probabilities": final_probs,
             "expected_goals": expected_goals,
             "most_likely_score": most_likely_score,
-            "confidence": self._calculate_confidence(final_probs),
+            "confidence": self._calculate_confidence(final_probs, scoring_probs, poisson_probs),
             "method_breakdown": {
                 "scoring": scoring_probs,
                 "poisson": poisson_probs,
@@ -105,8 +111,8 @@ class PredictionModel:
         scores['away'] += self.features.get('away_motivation', 5.0) * self.weights['motivation']
 
         # 4. Physical Condition (15%)
-        scores['home'] += self.features.get('home_physical_condition', 10.0) * self.weights['physical_condition']
-        scores['away'] += self.features.get('away_physical_condition', 10.0) * self.weights['physical_condition']
+        scores['home'] += self.features.get('home_physical_condition', 5.0) * self.weights['physical_condition']
+        scores['away'] += self.features.get('away_physical_condition', 5.0) * self.weights['physical_condition']
 
         # 5. Home Advantage (10%) - only for home team
         scores['home'] += self.features.get('home_field_advantage', 5.0) * self.weights['home_advantage']
@@ -265,9 +271,15 @@ class PredictionModel:
             '2': round(prob_2 / total, 4)
         }
 
-    def _calculate_expected_goals(self) -> Dict:
-        """Calculate expected goals from Poisson method"""
-        poisson_result = self._poisson_method()
+    def _calculate_expected_goals(self, poisson_result: Dict = None) -> Dict:
+        """
+        Calculate expected goals from Poisson method
+
+        Args:
+            poisson_result: Pre-calculated Poisson results (to avoid recalculation)
+        """
+        if poisson_result is None:
+            poisson_result = self._poisson_method()
 
         return {
             'home': round(poisson_result['_lambda_home'], 2),
@@ -291,7 +303,12 @@ class PredictionModel:
 
         return f"{best_score[0]}-{best_score[1]}"
 
-    def _calculate_confidence(self, probabilities: Dict) -> float:
+    def _calculate_confidence(
+        self,
+        probabilities: Dict,
+        scoring_probs: Dict = None,
+        poisson_probs: Dict = None
+    ) -> float:
         """
         Calculate prediction confidence
 
@@ -299,6 +316,11 @@ class PredictionModel:
         - Data quality
         - Probability spread
         - Method agreement
+
+        Args:
+            probabilities: Final ensemble probabilities
+            scoring_probs: Pre-calculated scoring method results (to avoid recalculation)
+            poisson_probs: Pre-calculated Poisson method results (to avoid recalculation)
         """
         # 1. Data quality
         data_confidence = self.features.get('_meta', {}).get('overall_confidence', 0.7)
@@ -310,8 +332,10 @@ class PredictionModel:
         spread_confidence = min(spread * 0.8, 0.8)
 
         # 3. Method agreement (low divergence = higher confidence)
-        scoring_probs = self._scoring_method()
-        poisson_probs = self._poisson_method()
+        if scoring_probs is None:
+            scoring_probs = self._scoring_method()
+        if poisson_probs is None:
+            poisson_probs = self._poisson_method()
 
         divergence = sum(abs(scoring_probs[k] - poisson_probs[k]) for k in ['1', 'X', '2'])
         method_agreement = max(0, 1 - divergence)

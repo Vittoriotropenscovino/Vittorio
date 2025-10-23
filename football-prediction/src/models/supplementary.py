@@ -18,7 +18,20 @@ class SupplementaryCalculations:
         Args:
             expected_goals: {'home': float, 'away': float}
             probabilities: {'1': float, 'X': float, '2': float}
+
+        Raises:
+            ValueError: If expected_goals or probabilities are invalid
         """
+        if not expected_goals or 'home' not in expected_goals or 'away' not in expected_goals:
+            raise ValueError("expected_goals must contain 'home' and 'away' keys")
+
+        if not probabilities or '1' not in probabilities or 'X' not in probabilities or '2' not in probabilities:
+            raise ValueError("probabilities must contain '1', 'X', and '2' keys")
+
+        # Validate xG values are non-negative
+        if expected_goals['home'] < 0 or expected_goals['away'] < 0:
+            raise ValueError("Expected goals cannot be negative")
+
         self.xg = expected_goals
         self.probs = probabilities
 
@@ -118,14 +131,29 @@ class SupplementaryCalculations:
         return scores[:top_n]
 
     def _goal_ranges(self) -> Dict:
-        """Probability of total goals falling in ranges"""
-        lambda_total = self.xg['home'] + self.xg['away']
+        """
+        Probability of total goals falling in ranges
+
+        Uses exact convolution of independent Poisson distributions
+        for more accurate probabilities
+        """
+        lambda_home = self.xg['home']
+        lambda_away = self.xg['away']
+
+        # Calculate exact total goals distribution via convolution
+        total_goals_prob = {}
+        for total in range(15):  # 0-14 total goals
+            prob = 0
+            for h in range(total + 1):
+                a = total - h
+                prob += poisson.pmf(h, lambda_home) * poisson.pmf(a, lambda_away)
+            total_goals_prob[total] = prob
 
         ranges = {
-            "0-1": sum(poisson.pmf(g, lambda_total) for g in range(2)),
-            "2-3": sum(poisson.pmf(g, lambda_total) for g in range(2, 4)),
-            "4-5": sum(poisson.pmf(g, lambda_total) for g in range(4, 6)),
-            "6+": 1 - sum(poisson.pmf(g, lambda_total) for g in range(6))
+            "0-1": sum(total_goals_prob[g] for g in range(2)),
+            "2-3": sum(total_goals_prob[g] for g in range(2, 4)),
+            "4-5": sum(total_goals_prob[g] for g in range(4, 6)),
+            "6+": sum(total_goals_prob[g] for g in range(6, 15))
         }
 
         return {k: round(v, 4) for k, v in ranges.items()}

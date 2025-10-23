@@ -7,8 +7,8 @@ import time
 from datetime import datetime, timedelta
 from typing import List
 
-from pipeline import MatchPredictionPipeline
-from learning import PostMatchAnalyzer, analyze_model_performance
+from .pipeline import MatchPredictionPipeline
+from .learning import PostMatchAnalyzer, analyze_model_performance
 
 logger = logging.getLogger(__name__)
 

@@ -5,11 +5,11 @@ import asyncio
 from datetime import datetime
 from typing import Optional
 
-from data_collection import DataCollectionOrchestrator, MatchAnalysisInput
-from processing import DataProcessor
-from models import PredictionModel, SupplementaryCalculations
-from validation import PredictionValidator
-from output import ReportGenerator, PredictionOutput, save_prediction
+from .data_collection import DataCollectionOrchestrator, MatchAnalysisInput
+from .processing import DataProcessor
+from .models import PredictionModel, SupplementaryCalculations
+from .validation import PredictionValidator
+from .output import ReportGenerator, PredictionOutput, save_prediction
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ class MatchPredictionPipeline:
             processor = DataProcessor(raw_data)
             features = processor.process()
             features['_meta'] = raw_data['_meta']
-            features['_odds'] = raw_data.get('odds', {}).get('data')
+            features['_odds'] = raw_data.get('odds')  # orchestrator already extracts 'data' field
 
             # STEP 4: Generate prediction
             logger.info("[STEP 4/6] Generating prediction...")

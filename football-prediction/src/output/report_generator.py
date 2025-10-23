@@ -64,7 +64,7 @@ class ReportGenerator:
 
             expected_goals=self.pred['expected_goals'],
 
-            over_under_2_5=supp.get('over_under', {}),
+            over_under_2_5=self._extract_over_under_2_5(supp),
             both_teams_score=supp.get('btts', {}),
             clean_sheet_probability=supp.get('clean_sheet', {}),
             top_correct_scores=supp.get('correct_score_top5', []),
@@ -82,6 +82,14 @@ class ReportGenerator:
         )
 
         return output
+
+    def _extract_over_under_2_5(self, supp: Dict) -> Dict[str, float]:
+        """Extract only over/under 2.5 values from supplementary data"""
+        over_under = supp.get('over_under', {})
+        return {
+            'over_2.5': over_under.get('over_2.5', 0.0),
+            'under_2.5': over_under.get('under_2.5', 0.0)
+        }
 
     def _extract_key_factors(self) -> Dict[str, List[str]]:
         """Identify top 3 factors for each side"""
@@ -157,7 +165,7 @@ class ReportGenerator:
 
     def _identify_value_bets(self) -> List[Dict]:
         """Identify value bets vs market odds"""
-        odds_data = self.data.get('odds', {}).get('data')
+        odds_data = self.data.get('odds')  # orchestrator already extracts 'data' field
 
         if not odds_data:
             return []
